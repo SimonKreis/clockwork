@@ -31,9 +31,9 @@ back on course, the engine remembers the correction. The metaphor is not decorat
 boundary: anything that would make the toy steer around an obstacle by itself is out. `README.md`
 maps each property onto the decision it stands for; use it when you are tempted to add cleverness.
 
-## State, as of 2026-09-24: archived
+## State, as of 2026-09-24: complete
 
-**Complete, and no longer developed.** The engine is
+**Complete; development stopped there.** The engine is
 verified offline: 70 checks green (a fake Oracle for the engine and for assisted mode, a synthetic
 legacy export for the converter, a temporary file for the profile editor), typecheck clean.
 
