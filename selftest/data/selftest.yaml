@@ -1,0 +1,10 @@
+# Data profile for the offline end to end self test.
+#
+# No credentials, and there is nowhere to put any: signing in happens once, out of band, and the
+# session is reused. A data profile holds business values only.
+title: "Playwright blueprint course"
+syllabus: "Content of the syllabus"
+StartDate: "2026-08-10"
+category: "HR"
+delivery: "Self-Paced"
+note: "Approved by the learning administrator"

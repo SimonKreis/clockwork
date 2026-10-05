@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Approval</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: .6rem; }
+    label { display: block; font-weight: 600; }
+    input { padding: .3rem; width: 20rem; border: 1px solid #999; }
+  </style>
+</head>
+<body>
+  <!--
+    A page inside a page, which is what Oracle does for BI Publisher and for classic ADF regions.
+
+    The point of this file is that "Approval Note" exists ONLY here. A search of the outer document
+    cannot find it by label, by role, by placeholder or by any selector: the label is not in that
+    document at all. That is why the resolution chain runs over every frame in turn, and why a
+    blueprint never has to mention a frame. The legacy platform switches frame by index and breaks the day Oracle
+    adds one.
+  -->
+  <label for="note">Approval Note</label>
+  <input id="note" />
+</body>
+</html>

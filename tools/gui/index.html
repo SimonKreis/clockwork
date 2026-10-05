@@ -1,0 +1,1000 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clockwork</title>
+<style>
+  :root {
+    --ink: #1a1a1a; --dim: #666; --line: #ddd; --bg: #fff; --panel: #fafafa;
+    --ok: #2e7d32; --ko: #c62828; --warn: #b26a00; --accent: #1565c0;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, sans-serif; color: var(--ink); background: var(--bg);
+         margin: 0; padding: 1.5rem 2rem; max-width: 1600px; }
+  h1 { margin: 0 0 .2rem; font-size: 1.4rem; }
+  h2 { font-size: 1rem; margin: 0 0 .6rem; text-transform: uppercase; letter-spacing: .06em;
+       color: var(--dim); }
+  .meta { color: var(--dim); font-size: .85rem; margin: 0 0 .8rem; }
+  .meta code { background: var(--panel); padding: .05rem .3rem; border-radius: 3px; }
+  .warnline { font-size: .82rem; color: var(--warn); background: #fff8e1; border: 1px solid #f0d8a8;
+              border-radius: 5px; padding: .5rem .7rem; margin: 0 0 1rem; }
+  section { border: 1px solid var(--line); border-radius: 6px; padding: 1rem 1.2rem;
+            margin-bottom: 1rem; background: var(--bg); }
+  button { font: inherit; padding: .45rem 1rem; border-radius: 5px; border: 1px solid var(--line);
+           background: var(--panel); cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary:hover:not(:disabled) { color: #fff; opacity: .9; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.small { padding: .25rem .6rem; font-size: .8rem; }
+  select, .filter { font: inherit; padding: .35rem .5rem; border: 1px solid var(--line);
+                    border-radius: 4px; background: var(--bg); }
+  .filter { width: 100%; margin: .2rem 0 .6rem; }
+
+  /* Two columns on a wide screen: the run on the left, the scenarios on the right. */
+  .layout { display: grid; gap: 1rem; align-items: start; }
+  @media (min-width: 1100px) {
+    .layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "main side"; }
+    .main { grid-area: main; }
+    .side { grid-area: side; position: sticky; top: 1rem; }
+    .side .scroller { max-height: calc(100vh - 12rem); overflow: auto; padding-right: .2rem; }
+  }
+
+  /* The scenarios as a mosaic of small tiles. The description is in the tooltip, not on the tile. */
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); gap: .35rem; }
+  .tile { display: flex; gap: .45rem; align-items: flex-start; min-width: 0;
+          border: 1px solid var(--line); border-radius: 5px; padding: .35rem .5rem;
+          cursor: pointer; background: var(--bg); }
+  .tile:hover { border-color: var(--accent); }
+  .tile.on { border-color: var(--accent); background: #f4f8fd; }
+  .tile.bad { border-color: var(--ko); background: #fdecea; cursor: not-allowed; }
+  .tile input { margin: .15rem 0 0; flex: none; }
+  .t-body { min-width: 0; }
+  .t-name { font-size: .8rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis;
+            white-space: nowrap; }
+  .t-meta { font-size: .7rem; color: var(--dim); overflow: hidden; text-overflow: ellipsis;
+            white-space: nowrap; }
+
+  .name { font-weight: 600; }
+  .tag { font-size: .75rem; color: var(--dim); }
+  .err { font-size: .82rem; color: var(--ko); margin-top: .25rem; white-space: pre-wrap; }
+  .field { display: grid; grid-template-columns: 210px 1fr; gap: .6rem; align-items: start;
+           padding: .5rem 0; border-top: 1px solid var(--line); }
+  .field:first-of-type { border-top: 0; }
+  .field .k { font-family: ui-monospace, Consolas, monospace; font-size: .85rem; padding-top: .45rem;
+              overflow-wrap: anywhere; }
+  .field .hint { font-size: .78rem; color: var(--dim); margin-top: .25rem; }
+  .field input { font: inherit; width: 100%; padding: .4rem .5rem; border: 1px solid var(--line);
+                 border-radius: 4px; }
+  .field input.todo { border-color: var(--warn); background: #fff8e1; }
+  .pill { display: inline-block; font-size: .75rem; padding: .1rem .5rem; border-radius: 10px; }
+  .pill.ok { background: #e6f4ea; color: var(--ok); }
+  .pill.ko { background: #fdecea; color: var(--ko); }
+  .pill.warn { background: #fff3cd; color: var(--warn); }
+  .pill.run { background: #e3f2fd; color: var(--accent); }
+  .controls { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; }
+  .controls .spacer { flex: 1; }
+  .toggle { font-size: .85rem; color: var(--dim); display: flex; gap: .3rem; align-items: center; }
+  table.steps { border-collapse: collapse; width: 100%; font-size: .85rem; }
+  table.steps td { border-bottom: 1px solid var(--line); padding: .35rem .5rem; vertical-align: top; }
+  table.steps td.n { width: 2.5rem; color: var(--dim); }
+  table.steps tr.group td { background: var(--panel); font-weight: 600; font-size: .82rem; }
+  table.steps tr.passed td.n { border-left: 3px solid var(--ok); }
+  table.steps tr.failed td.n { border-left: 3px solid var(--ko); }
+  table.steps tr.failed { background: #fdecea; }
+  table.steps tr.skipped { color: #999; }
+  pre.log { background: #1e1e1e; color: #ddd; padding: .8rem; border-radius: 5px; font-size: .78rem;
+            max-height: 16rem; overflow: auto; white-space: pre-wrap; margin: .6rem 0 0; }
+  details summary { cursor: pointer; font-size: .85rem; color: var(--dim); }
+  .note { font-size: .8rem; color: var(--dim); margin-top: .6rem; }
+  a { color: var(--accent); }
+  .empty { color: var(--dim); font-size: .85rem; }
+
+  /* The wind up toy. Nothing depends on any of this. */
+  h1 { user-select: none; }
+  #toybox { margin: .4rem 0 1rem; }
+  #toy { image-rendering: pixelated; display: block; }
+  #toy-caption { font-size: .78rem; color: var(--dim); margin: .3rem 0 0; max-width: 440px; }
+</style>
+</head>
+<body>
+
+<h1 id="logo">Clockwork</h1>
+<div id="toybox" hidden>
+  <canvas id="toy" width="440" height="136"></canvas>
+  <p id="toy-caption">
+    Stored energy, a straight line, no autonomy, and a clean stop at the first obstacle.
+    Then a hand picks it up.
+  </p>
+</div>
+<p class="meta" id="env"></p>
+<p class="warnline" id="ws-warn" hidden></p>
+
+<div class="layout">
+  <main class="main">
+    <section id="s-session">
+      <h2>1. Session</h2>
+      <div class="controls">
+        <span id="session-state" class="empty">checking</span>
+        <span class="spacer"></span>
+        <button id="btn-auth">Sign in</button>
+      </div>
+      <p class="note" id="session-note">
+        No password is typed here and none is stored.
+      </p>
+    </section>
+
+    <section id="s-data">
+      <h2>3. Data</h2>
+      <div class="controls" id="profile-bar" hidden>
+        <span class="tag" id="profile-pick-label"></span>
+        <select id="profile-pick"></select>
+      </div>
+      <div id="profile"><p class="empty">Choose one or more scenarios on the right.</p></div>
+    </section>
+
+    <section id="s-run">
+      <h2>4. Run</h2>
+      <div class="controls">
+        <button id="btn-run" class="primary" disabled>Run</button>
+        <button id="btn-stop" disabled>Stop</button>
+        <label class="toggle"><input type="checkbox" id="opt-assist" checked> pause and let me help</label>
+        <label class="toggle"><input type="checkbox" id="opt-headless"> hide the browser</label>
+        <label class="toggle"><input type="checkbox" id="opt-watch"> slow down so I can follow</label>
+        <span class="spacer"></span>
+        <span id="run-state"></span>
+      </div>
+      <p class="err" id="run-alert" hidden></p>
+      <p class="note" id="run-note">
+        A run is watched by default: when a label cannot be found, the browser stays open on that screen
+        with a banner listing what is actually there, you do the step yourself, and the scenario file is
+        corrected from what you clicked.
+      </p>
+    </section>
+
+    <section id="s-progress" hidden>
+      <h2>5. Progress</h2>
+      <table class="steps"><tbody id="steps"></tbody></table>
+      <details><summary>Output</summary><pre class="log" id="log"></pre></details>
+    </section>
+
+    <section id="s-report">
+      <h2>6. Report</h2>
+      <div class="controls">
+        <button id="btn-report" disabled>Build the report for this run</button>
+        <span class="spacer"></span>
+      </div>
+      <div id="reports"></div>
+    </section>
+  </main>
+
+  <aside class="side">
+    <section id="s-scenario">
+      <h2>2. Scenarios</h2>
+      <div class="controls">
+        <span class="tag" id="bp-count"></span>
+        <span class="spacer"></span>
+        <span class="tag" id="bp-selected"></span>
+        <button class="small" id="btn-select-shown">Select shown</button>
+        <button class="small" id="btn-clear" disabled>Clear</button>
+      </div>
+      <input class="filter" id="bp-filter" type="search"
+             placeholder="Filter by name, ticket or data profile">
+      <div class="scroller"><div id="blueprints"><p class="empty">loading</p></div></div>
+    </section>
+  </aside>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var state = null;
+  var chosen = {};          // scenario name -> true: the selection, kept across refreshes
+  var filterText = '';
+  var profile = null;       // the data profile shown in section 3
+  var profileName = '';     // which one it is, when the selection uses several
+  var run = null;           // the run in progress or the last one
+
+  /** More than this many scenarios at once asks first: every one of them will want a sign in. */
+  var CONFIRM_ABOVE = 10;
+
+  function $(id) { return document.getElementById(id); }
+  function text(s) { return document.createTextNode(s); }
+  function el(tag, cls, content) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (content !== undefined) e.textContent = content;
+    return e;
+  }
+
+  function api(method, path, body) {
+    return fetch(path, {
+      method: method,
+      headers: body ? { 'content-type': 'application/json' } : {},
+      body: body ? JSON.stringify(body) : undefined
+    }).then(function (r) {
+      return r.json().then(function (data) {
+        if (!r.ok) throw new Error(data.error || ('HTTP ' + r.status));
+        return data;
+      });
+    });
+  }
+
+  // ------------------------------------------------------------------ header
+
+  function renderEnv() {
+    var p = $('env');
+    p.innerHTML = '';
+    p.appendChild(text('Environment '));
+    p.appendChild(el('code', null, state.baseUrl || 'not set'));
+    p.appendChild(text('  ·  browser '));
+    p.appendChild(el('code', null, state.browser));
+    p.appendChild(text('  ·  workspace '));
+    p.appendChild(el('code', null, state.workspace.root));
+
+    // What has to be done before anything else works, said once, at the top.
+    var notes = [];
+    if (!state.baseUrl) {
+      notes.push('ORACLE_BASE_URL is not set. Fill it in ' + state.workspace.env
+        + ', then restart Clockwork.');
+    }
+    if (state.workspace.legacy.length) {
+      notes.push('Found in the application folder, where it no longer belongs and is ignored: '
+        + state.workspace.legacy.join(', ') + '. Move it into ' + state.workspace.root + '.');
+    }
+    var w = $('ws-warn');
+    w.textContent = notes.join(' ');
+    w.hidden = !notes.length;
+  }
+
+  // ------------------------------------------------------------------ session
+
+  function renderSession() {
+    var s = $('session-state');
+    s.className = '';
+    // Window mode (D19): no saved session to describe, and no separate sign in step.
+    if (state.sessionMode === 'window') {
+      $('btn-auth').hidden = true;
+      s.innerHTML = '';
+      s.appendChild(el('span', 'pill ok', 'sign in at the start of each run'));
+      s.appendChild(text(' in the window the run opens: ' + state.browser + '.'));
+      $('session-note').textContent = 'No password is typed here and none is stored. Each run '
+        + 'opens on the sign in page in its own window: you sign in there, second factor '
+        + 'included, and the scenario starts by itself once you are in. Nothing about the '
+        + 'session is kept afterwards, so every run begins with you signing in.';
+      $('opt-headless').checked = false;
+      $('opt-headless').disabled = true;
+      $('opt-headless').parentNode.title = 'A hidden run cannot sign in. Hidden runs need SESSION=saved.';
+      return;
+    }
+    $('btn-auth').hidden = false;
+    $('session-note').textContent = 'No password is typed here and none is stored. Sign in opens '
+      + 'a real browser window on the environment: you sign in there, second factor included, and '
+      + 'close it. The session is reused by every run until Oracle expires it.';
+    // Oracle's own answer, when there is one, beats anything the file's age suggests.
+    if (checking) return;
+    if (sessionLive !== undefined) { renderLive(); return; }
+    s.innerHTML = '';
+    if (state.session.present) {
+      var hours = Math.round((Date.now() - new Date(state.session.capturedAt).getTime()) / 3600000);
+      s.appendChild(el('span', 'pill ' + (hours >= 8 ? 'warn' : 'ok'), 'session saved'));
+      s.appendChild(text(' ' + (hours < 1 ? 'less than an hour' : hours + ' hour(s)') + ' ago'
+        + (hours >= 8 ? ', old enough that Oracle has probably expired it' : '')));
+    } else {
+      s.appendChild(el('span', 'pill ko', 'no session'));
+      s.appendChild(text(' sign in before running anything'));
+    }
+  }
+
+  /**
+   * Whether Oracle still accepts the saved session, asked rather than guessed. Saved mode only.
+   * undefined: not asked yet. true or false: Oracle's answer. null: the question could not be put.
+   */
+  var sessionLive;
+  var sessionDetail = '';
+  var checking = false;
+
+  function checkSession() {
+    if (checking) return;
+    checking = true;
+    var s = $('session-state');
+    s.innerHTML = '';
+    s.appendChild(el('span', 'pill run', 'asking Oracle'));
+    s.appendChild(text(' whether the saved session still works'));
+    return api('GET', '/api/session')
+      .then(function (r) { sessionLive = r.valid; sessionDetail = r.detail; })
+      .catch(function (e) { sessionLive = null; sessionDetail = e.message; })
+      .then(function () { checking = false; renderSession(); });
+  }
+
+  function renderLive() {
+    var s = $('session-state');
+    s.innerHTML = '';
+    s.appendChild(sessionLive === true ? el('span', 'pill ok', 'session valid')
+      : sessionLive === false ? el('span', 'pill ko', 'session expired')
+      : el('span', 'pill warn', 'could not check'));
+    s.appendChild(text(' ' + sessionDetail + (sessionLive === false ? ' Click Sign in.' : '')));
+  }
+
+  function showAlert(message) {
+    var a = $('run-alert');
+    a.className = 'err';
+    a.textContent = message;
+    a.hidden = false;
+  }
+  /** Same place, calmer colour: something to do, not something that went wrong. */
+  function showInfo(message) {
+    showAlert(message);
+    $('run-alert').className = 'note';
+  }
+  function hideAlert() { $('run-alert').hidden = true; }
+  function logHas(needle) { return $('log').textContent.indexOf(needle) >= 0; }
+
+  // ------------------------------------------------------------------ scenarios
+
+  function selection() {
+    if (!state) return [];
+    return state.blueprints.filter(function (b) { return chosen[b.scenario] && !b.error; });
+  }
+
+  function matches(bp) {
+    if (!filterText) return true;
+    var hay = [bp.scenario, bp.source, bp.dataProfile, bp.description].join(' ').toLowerCase();
+    return filterText.split(/\s+/).every(function (word) { return hay.indexOf(word) >= 0; });
+  }
+
+  function shownBlueprints() { return state.blueprints.filter(matches); }
+
+  function renderBlueprints() {
+    var box = $('blueprints');
+    box.innerHTML = '';
+    var all = state.blueprints;
+    $('bp-count').textContent = all.length ? all.length + ' in the workspace' : '';
+
+    if (!all.length) {
+      box.appendChild(el('p', 'empty', 'No scenario yet in ' + state.blueprintsDir + '. Write one '
+        + 'by hand from the template in ' + state.templatesDir + ', or put a legacy export in '
+        + 'legacy-exports/ and run npm run convert.'));
+      renderSelectionBar();
+      return;
+    }
+
+    var shown = shownBlueprints();
+    if (!shown.length) box.appendChild(el('p', 'empty', 'Nothing matches "' + filterText + '".'));
+
+    var grid = el('div', 'tiles');
+    shown.forEach(function (bp) {
+      var tile = el('label', 'tile' + (bp.error ? ' bad' : chosen[bp.scenario] ? ' on' : ''));
+      // The description and any load error live in the tooltip, which is what keeps a tile small.
+      tile.title = bp.error
+        ? bp.scenario + '\n\n' + bp.error
+        : [bp.scenario, bp.description, bp.dataProfile ? 'data: ' + bp.dataProfile : '']
+            .filter(Boolean).join('\n\n');
+
+      var input = el('input');
+      input.type = 'checkbox';
+      input.checked = Boolean(chosen[bp.scenario]);
+      input.disabled = Boolean(bp.error);
+      input.addEventListener('change', function () {
+        if (input.checked) chosen[bp.scenario] = true;
+        else delete chosen[bp.scenario];
+        tile.classList.toggle('on', input.checked);
+        selectionChanged();
+      });
+
+      var body = el('div', 't-body');
+      body.appendChild(el('div', 't-name', bp.scenario));
+      body.appendChild(el('div', 't-meta',
+        [bp.source, bp.steps + ' steps', bp.error ? 'will not load' : ''].filter(Boolean).join(' · ')));
+      tile.appendChild(input);
+      tile.appendChild(body);
+      grid.appendChild(tile);
+    });
+    box.appendChild(grid);
+    renderSelectionBar();
+  }
+
+  function renderSelectionBar() {
+    var n = selection().length;
+    $('bp-selected').textContent = n ? n + ' selected' : '';
+    $('btn-clear').disabled = !n;
+  }
+
+  function selectionChanged() {
+    renderSelectionBar();
+    renderProfilePicker();
+    renderRun();
+  }
+
+  // ------------------------------------------------------------------ data
+
+  function selectedProfiles() {
+    var seen = {};
+    var out = [];
+    selection().forEach(function (b) {
+      if (b.dataProfile && !seen[b.dataProfile]) {
+        seen[b.dataProfile] = true;
+        out.push(b.dataProfile);
+      }
+    });
+    return out;
+  }
+
+  function renderProfilePicker() {
+    var names = selectedProfiles();
+    var bar = $('profile-bar');
+    if (!selection().length || !names.length) {
+      bar.hidden = true;
+      profile = null;
+      profileName = '';
+      $('profile').innerHTML = '';
+      $('profile').appendChild(el('p', 'empty', selection().length
+        ? 'The selected scenarios use no data profile.'
+        : 'Choose one or more scenarios on the right.'));
+      return;
+    }
+    if (names.indexOf(profileName) < 0) profileName = names[0];
+
+    // Several profiles: say so, and let the tester pick which one to fill. One: nothing to choose.
+    bar.hidden = names.length < 2;
+    $('profile-pick-label').textContent = 'The selection uses ' + names.length + ' data profiles:';
+    var pick = $('profile-pick');
+    pick.innerHTML = '';
+    names.forEach(function (n) {
+      var o = el('option', null, n);
+      o.value = n;
+      o.selected = n === profileName;
+      pick.appendChild(o);
+    });
+    if (!profile || profile.name !== profileName) loadProfile(profileName);
+  }
+
+  function loadProfile(name) {
+    api('GET', '/api/profile?name=' + encodeURIComponent(name))
+      .then(function (p) {
+        if (name !== profileName) return;   // a newer choice arrived while this one was loading
+        profile = p;
+        renderProfile();
+      })
+      .catch(function (e) {
+        $('profile').innerHTML = '';
+        $('profile').appendChild(el('p', 'err', e.message));
+      });
+  }
+
+  function renderProfile() {
+    var box = $('profile');
+    box.innerHTML = '';
+
+    var todo = profile.fields.filter(function (f) { return f.needsFilling; }).length;
+    var head = el('div', 'controls');
+    head.appendChild(el('span', 'pill ' + (todo ? 'warn' : 'ok'),
+      todo ? todo + ' value(s) still to choose' : 'complete'));
+    head.appendChild(el('span', 'tag', profile.name));
+    head.appendChild(el('span', 'spacer'));
+    var save = el('button', null, 'Save');
+    save.addEventListener('click', saveProfile);
+    head.appendChild(save);
+    box.appendChild(head);
+
+    profile.fields.forEach(function (f) {
+      var wrap = el('div', 'field');
+      wrap.appendChild(el('div', 'k', f.key));
+      var right = el('div');
+      var input = el('input');
+      input.value = f.value;
+      input.dataset.key = f.key;
+      if (f.needsFilling) input.className = 'todo';
+      right.appendChild(input);
+      if (f.comment) right.appendChild(el('div', 'hint', f.comment));
+      wrap.appendChild(right);
+      box.appendChild(wrap);
+    });
+
+    box.appendChild(el('p', 'note',
+      'Saving rewrites only the value lines. The comments above each field, which are where the '
+      + 'reason for a value is recorded, are left untouched.'));
+  }
+
+  function saveProfile() {
+    var values = {};
+    document.querySelectorAll('#profile input[data-key]').forEach(function (i) {
+      values[i.dataset.key] = i.value;
+    });
+    api('POST', '/api/profile', { name: profile.name, values: values })
+      .then(function (r) {
+        profile.fields = r.fields;
+        renderProfile();
+        flash(r.changed.length ? 'Saved: ' + r.changed.join(', ') : 'Nothing changed.');
+      })
+      .catch(function (e) { flash(e.message); });
+  }
+
+  function flash(message) {
+    var note = $('run-note');
+    var old = note.textContent;
+    note.textContent = message;
+    setTimeout(function () { note.textContent = old; }, 4000);
+  }
+
+  // ------------------------------------------------------------------ running
+
+  function runLabel(r) {
+    if (r.kind !== 'test') return 'sign in';
+    var s = r.scenarios || [];
+    return s.length === 1 ? s[0] : s.length + ' scenarios';
+  }
+
+  function renderRun() {
+    var s = $('run-state');
+    s.innerHTML = '';
+    var n = selection().length;
+    var busy = Boolean(run && run.status === 'running');
+    $('btn-run').disabled = !n || busy;
+    $('btn-run').textContent = n > 1 ? 'Run ' + n + ' scenarios' : 'Run';
+    $('btn-stop').disabled = !busy;
+    $('btn-auth').disabled = busy;
+    $('btn-report').disabled = !run || run.kind !== 'test' || busy;
+
+    if (!run) return;
+    var cls = run.status === 'running' ? 'run' : run.status === 'passed' ? 'ok'
+      : run.status === 'stopped' ? 'warn' : 'ko';
+    s.appendChild(el('span', 'pill ' + cls, run.status));
+    s.appendChild(text(' ' + runLabel(run)));
+  }
+
+  function renderSteps() {
+    $('s-progress').hidden = !run || run.kind !== 'test';
+    var body = $('steps');
+    body.innerHTML = '';
+    if (!run) return;
+    var last = null;
+    run.records.forEach(function (r) {
+      // A heading row each time the scenario changes, so a selection reads as one block per test.
+      if (r.scenario !== last) {
+        last = r.scenario;
+        var head = el('tr', 'group');
+        var cell = el('td', null, r.scenario);
+        cell.colSpan = 3;
+        head.appendChild(cell);
+        body.appendChild(head);
+      }
+      var tr = el('tr', r.status);
+      tr.appendChild(el('td', 'n', String(r.step_index)));
+      tr.appendChild(el('td', null, r.keyword + (r.label ? ' ' + r.label : '')));
+      var detail = [r.value_used, r.oracle_error_text, r.error_message]
+        .filter(Boolean).join(' · ').slice(0, 400);
+      tr.appendChild(el('td', null, detail));
+      body.appendChild(tr);
+    });
+  }
+
+  function appendLog(line) {
+    var log = $('log');
+    log.textContent += line + '\n';
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function adopt(r) {
+    run = r;
+    if (run) {
+      $('log').textContent = (run.output || []).join('\n') + (run.output.length ? '\n' : '');
+    }
+    renderRun();
+    renderSteps();
+  }
+
+  // ------------------------------------------------------------------ wiring
+
+  $('btn-auth').addEventListener('click', function () {
+    hideAlert();
+    $('s-progress').hidden = false;
+    $('log').textContent = '';
+    api('POST', '/api/auth', {}).then(adopt).catch(function (e) { flash(e.message); });
+  });
+
+  $('btn-run').addEventListener('click', function () {
+    var list = selection().map(function (b) { return b.scenario; });
+    if (!list.length) return;
+    if (sessionLive === false) {
+      showAlert('The Oracle session has expired, so this run would stop before its first step. '
+        + 'Click Sign in first, then run again.');
+      return;
+    }
+    if (list.length > CONFIRM_ABOVE && !window.confirm('Run ' + list.length + ' scenarios, one '
+        + 'after the other? Each one opens its own window and asks you to sign in.')) {
+      return;
+    }
+    hideAlert();
+    if (state && state.sessionMode === 'window') {
+      showInfo(list.length > 1
+        ? 'The ' + list.length + ' scenarios run one after the other. Each opens its own window on '
+          + 'the sign in page: sign in there each time, and it starts by itself once you are in.'
+        : 'A browser window is opening on the sign in page. Sign in there, second factor '
+          + 'included, and the scenario starts by itself once you are in.');
+    }
+    $('steps').innerHTML = '';
+    $('log').textContent = '';
+    api('POST', '/api/run', {
+      scenarios: list,
+      assist: $('opt-assist').checked,
+      headless: $('opt-headless').checked,
+      watch: $('opt-watch').checked
+    }).then(adopt).catch(function (e) { flash(e.message); });
+  });
+
+  /**
+   * The two switches contradict each other, so the page never lets both be on. A run that pauses
+   * waits, without a timeout, for somebody to act in a window that hiding the browser removed.
+   */
+  function syncOptions(changed) {
+    var assist = $('opt-assist');
+    var headless = $('opt-headless');
+    if (changed === 'headless' && headless.checked) assist.checked = false;
+    if (changed === 'assist' && assist.checked) headless.checked = false;
+    $('run-note').textContent = assist.checked
+      ? 'A run is watched by default: when a label cannot be found, the browser stays open on that '
+        + 'screen with a banner listing what is actually there, you do the step yourself, and the '
+        + 'scenario file is corrected from what you clicked.'
+      : 'Nobody is watching this run: a label that cannot be found fails the step and the report '
+        + 'says so, instead of waiting for help.';
+  }
+  $('opt-assist').addEventListener('change', function () { syncOptions('assist'); });
+  $('opt-headless').addEventListener('change', function () { syncOptions('headless'); });
+
+  $('bp-filter').addEventListener('input', function () {
+    filterText = $('bp-filter').value.trim().toLowerCase();
+    renderBlueprints();
+  });
+  $('btn-select-shown').addEventListener('click', function () {
+    shownBlueprints().forEach(function (b) { if (!b.error) chosen[b.scenario] = true; });
+    renderBlueprints();
+    selectionChanged();
+  });
+  $('btn-clear').addEventListener('click', function () {
+    chosen = {};
+    renderBlueprints();
+    selectionChanged();
+  });
+  $('profile-pick').addEventListener('change', function () {
+    profileName = $('profile-pick').value;
+    loadProfile(profileName);
+  });
+
+  $('btn-stop').addEventListener('click', function () {
+    api('POST', '/api/stop', {}).catch(function (e) { flash(e.message); });
+  });
+
+  $('btn-report').addEventListener('click', function () {
+    api('POST', '/api/report', { runId: run.id })
+      .then(function (r) { window.open(r.url, '_blank'); refresh(); })
+      .catch(function (e) { flash(e.message); });
+  });
+
+  function renderReports() {
+    var box = $('reports');
+    box.innerHTML = '';
+    if (!state.reports.length) {
+      box.appendChild(el('p', 'empty', 'No report has been generated yet.'));
+      return;
+    }
+    state.reports.forEach(function (r) {
+      var p = el('p');
+      p.style.margin = '.2rem 0';
+      var a = el('a', null, r.file);
+      a.href = r.url;
+      a.target = '_blank';
+      p.appendChild(a);
+      box.appendChild(p);
+    });
+  }
+
+  function refresh() {
+    return api('GET', '/api/state').then(function (s) {
+      state = s;
+      // Keep the selection across refreshes, minus anything that disappeared or stopped loading.
+      var loadable = {};
+      state.blueprints.forEach(function (b) { if (!b.error) loadable[b.scenario] = true; });
+      Object.keys(chosen).forEach(function (k) { if (!loadable[k]) delete chosen[k]; });
+      renderEnv();
+      renderSession();
+      renderBlueprints();
+      renderReports();
+      renderProfilePicker();
+      renderRun();
+    });
+  }
+
+  var events = new EventSource('/api/events');
+  events.addEventListener('hello', function (e) { adopt(JSON.parse(e.data)); });
+  events.addEventListener('started', function (e) { adopt(JSON.parse(e.data)); });
+  events.addEventListener('output', function (e) {
+    var line = JSON.parse(e.data).line;
+    appendLog(line);
+    // The engine announces the two moments of a sign in; say them where the tester is looking.
+    var head = line.trim();
+    if (head.indexOf('WAITING FOR SIGN IN') === 0) {
+      var who = head.slice('WAITING FOR SIGN IN'.length).trim();
+      showInfo('Waiting for you to sign in' + (who ? ' for ' + who : '') + ', in the browser '
+        + 'window. The scenario starts by itself once you are in.');
+    } else if (head.indexOf('SIGNED IN') === 0) {
+      var what = head.slice('SIGNED IN'.length).replace(/^\s*starting\s*/, '').trim();
+      showInfo('Signed in. ' + (what ? what + ' is' : 'The scenario is') + ' running in that window.');
+    }
+  });
+  events.addEventListener('step', function (e) {
+    if (!run) return;
+    run.records.push(JSON.parse(e.data));
+    renderSteps();
+  });
+  events.addEventListener('done', function (e) {
+    var d = JSON.parse(e.data);
+    if (run) { run.status = d.status; run.exitCode = d.exitCode; }
+    if (run && run.kind === 'auth') {
+      hideAlert();
+      checkSession();
+    } else if (d.status === 'failed' && logHas('browserType.launch')) {
+      showAlert('The browser could not be started. Clockwork drives Chromium based browsers only: '
+        + 'Chrome, Edge, Brave, Vivaldi or Opera. The output below names the one it tried; set '
+        + 'BROWSER_EXECUTABLE in the workspace .env to use another.');
+    } else if (d.status === 'failed' && logHas('SessionError')) {
+      // Say what happened in words. What the tester saw was a window that opened and closed,
+      // which looks exactly like a crash and is not one.
+      if (state && state.sessionMode === 'window') {
+        showAlert('Stopped before the first step: the run could not sign in. Either the window '
+          + 'was closed before the sign in finished, or the browser was hidden. The output below '
+          + 'says which.');
+      } else {
+        sessionLive = false;
+        sessionDetail = 'Oracle sent the run to its sign in page.';
+        showAlert('Stopped before the first step: the Oracle session has expired. The browser '
+          + 'closed because the test ended, not because it crashed. Click Sign in, then run again.');
+      }
+    } else if (run && run.kind === 'test') {
+      // The run got going, so the sign in note has done its job.
+      hideAlert();
+    }
+    renderRun();
+    refresh();
+  });
+
+  refresh().then(function () {
+    // Only a saved session can be asked about. In window mode there is none, by design.
+    if (state && state.sessionMode === 'saved') checkSession();
+  });
+})();
+</script>
+
+<script>
+/**
+ * The wind up toy, behind the title.
+ *
+ * Not decoration for its own sake: this is the image the whole project is named after and argues
+ * from, written down in README.md and in AGENTS.md. Stored energy, a straight line, no autonomy, a
+ * clean stop at the first obstacle, and then a hand that picks the toy up and puts it back. Every
+ * scope decision in this repository is that sentence applied to something. It seemed right that the
+ * one piece of ornament in the tool should be the argument itself.
+ *
+ * Self contained, on purpose: a canvas, a palette, two sprites and a clock. Nothing below is
+ * imported, exported, or depended on by anything else, so it can be deleted in one cut.
+ */
+(function () {
+  'use strict';
+
+  var S = 4;                    // pixels per pixel
+  var W = 110, H = 34;          // the scene, in its own small units
+  var GROUND = 28;              // where the floor line sits
+  var WALL_X = 94;              // the obstacle, which is the point of the whole thing
+  var START_X = 8;
+  // The sprite carries two blank columns on each side, so the painted nose is at carX + 14.
+  // Stopping at WALL_X - 16 leaves a visible gap; the toy has to actually touch the bricks.
+  var NOSE_AT_WALL = 94 - 14;
+
+  var canvas = document.getElementById('toy');
+  var box = document.getElementById('toybox');
+  var logo = document.getElementById('logo');
+  if (!canvas || !box || !logo) return;
+  var ctx = canvas.getContext('2d');
+
+  var PALETTE = {
+    b: '#1565c0',   // body
+    w: '#bbdefb',   // windows
+    l: '#c62828',   // tail light
+    r: '#ffca28',   // head light
+    t: '#37474f',   // tyres
+    n: '#78909c',   // hub, the moving part of a wheel
+    k: '#9e9e9e',   // the key
+    h: '#e8b48c',   // hand
+    s: '#455a64',   // sleeve
+    g: '#cfcfcf',   // ground
+    m: '#b0705a',   // wall
+    o: '#8d5847',   // mortar
+    d: '#bdbdbd'    // dust
+  };
+
+  var CAR = [
+    '.....bbbbbb.....',
+    '....bwwbbwwb....',
+    '..bbbbbbbbbbbb..',
+    '..bbbbbbbbbbbb..',
+    '..blbbbbbbbbrb..',
+    '...tt......tt...',
+    '...tt......tt...'
+  ];
+  var CAR_H = CAR.length;
+
+  // A plus and a cross, alternating. Two frames is all a spinning key needs.
+  var KEY = [
+    ['.k.', 'kkk', '.k.'],
+    ['k.k', '.k.', 'k.k']
+  ];
+
+  var HAND_SHUT = [
+    '...ssssss...',
+    '...ssssss...',
+    '..hhhhhhhh..',
+    '.hhhhhhhhhh.',
+    'hhhhhhhhhhhh',
+    'hhhhhhhhhhhh',
+    '.hhhhhhhhhh.',
+    '..hh.hh.hh..',
+    '..hh.hh.hh..'
+  ];
+  var HAND_OPEN = [
+    '...ssssss...',
+    '...ssssss...',
+    '..hhhhhhhh..',
+    '.hhhhhhhhhh.',
+    'hhhhhhhhhhhh',
+    '.hhhhhhhhhh.',
+    'h.hh..hh..h.',
+    'h.hh..hh..h.',
+    'h..h..h...h.'
+  ];
+
+  /** Where each speck of dust goes when the toy meets the wall. Up and back, never forward. */
+  var BURST = [[-0.5, -0.8], [-0.8, -0.3], [-0.25, -0.8], [-1, -0.1], [-0.6, -1], [-0.1, -1.1]];
+
+  // The hand grips the roof, which fixes both offsets for good.
+  var HAND_DX = 2;
+  var HAND_DY = -7;
+
+  function px(x, y, color) {
+    ctx.fillStyle = color;
+    ctx.fillRect(Math.round(x) * S, Math.round(y) * S, S, S);
+  }
+
+  function sprite(rows, x, y) {
+    for (var r = 0; r < rows.length; r++) {
+      for (var c = 0; c < rows[r].length; c++) {
+        var ch = rows[r][c];
+        if (ch === '.') continue;
+        var color = PALETTE[ch];
+        if (color) px(x + c, y + r, color);
+      }
+    }
+  }
+
+  function scene() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (var x = 0; x < W; x++) px(x, GROUND, PALETTE.g);
+    // The wall, with courses offset every other row so it reads as brick and not as a block.
+    for (var y = 10; y < GROUND; y++) {
+      for (var wx = WALL_X; wx < WALL_X + 8; wx++) {
+        var mortar = y % 3 === 0 || (wx - WALL_X + (y % 6 < 3 ? 0 : 2)) % 4 === 0;
+        px(wx, y, mortar ? PALETTE.o : PALETTE.m);
+      }
+    }
+  }
+
+  function car(x, y, spin, rolling) {
+    sprite(CAR, x, y);
+    sprite(KEY[spin % 2], x + 7, y - 3);
+    if (rolling) {
+      // One lighter pixel per wheel, moving. A wheel that never changes reads as a sledge.
+      px(x + 3 + (spin % 2), y + 5, PALETTE.n);
+      px(x + 11 + (spin % 2), y + 5, PALETTE.n);
+    }
+  }
+
+  function ease(p, power) { return 1 - Math.pow(1 - p, power); }
+  function lerp(a, b, p) { return a + (b - a) * p; }
+  function clamp01(p) { return p < 0 ? 0 : p > 1 ? 1 : p; }
+
+  /**
+   * The whole story, as one function of elapsed time.
+   *
+   * Written as a timeline rather than as a state machine so the reading order on screen and the
+   * reading order in this file are the same. The car never steers, and there is no branch here
+   * that could ever make it.
+   */
+  var PLACE = 1000, LET_GO = 1500, WIND = 2200, HIT = 3800, SETTLE = 4300,
+      REACH = 5300, GRIP = 5700, LIFT = 6700, LOOP = 7600;
+
+  function frame(t) {
+    scene();
+
+    var carY = GROUND - CAR_H;
+    var spin = Math.floor(t / 90);
+    var carX = START_X;
+    var handY = null;
+    var handShut = true;
+
+    if (t < PLACE) {
+      // A hand comes down and sets the toy on the floor.
+      var p = ease(t / PLACE, 3);
+      carY = lerp(-CAR_H - 2, GROUND - CAR_H, p);
+      handY = carY + HAND_DY;
+    } else if (t < LET_GO) {
+      // It opens and leaves.
+      var p2 = clamp01((t - PLACE) / (LET_GO - PLACE));
+      handShut = false;
+      handY = lerp(carY + HAND_DY, -12, ease(p2, 2));
+    } else if (t < WIND) {
+      // Winding: the key spins and nothing else happens yet.
+      spin = Math.floor(t / 45);
+    } else if (t < HIT) {
+      var p3 = clamp01((t - WIND) / (HIT - WIND));
+      carX = lerp(START_X, NOSE_AT_WALL, Math.pow(p3, 0.85));
+      carY = GROUND - CAR_H - (spin % 2);   // a one pixel bob, which is the whole suspension
+      spin = Math.floor(t / 45);
+      px(carX - 2, GROUND - 1, PALETTE.d);
+      if (spin % 2) px(carX - 4, GROUND - 2, PALETTE.d);
+    } else if (t < SETTLE) {
+      // The stop. It does not go around, it does not try again.
+      var p4 = clamp01((t - HIT) / (SETTLE - HIT));
+      carX = NOSE_AT_WALL - (p4 < 0.5 ? Math.round(Math.sin(p4 * 40) * 1.5) : 0);
+      for (var i = 0; i < BURST.length; i++) {
+        // Each speck keeps its own direction and its own lifetime, so the impact reads as a
+        // scatter. Give them all one heading and it reads as a streak, which looks like a bug.
+        if (p4 > 0.55 + i * 0.07) continue;
+        var far = p4 * 9;
+        px(WALL_X - 2 + BURST[i][0] * far, GROUND - 4 + BURST[i][1] * far, PALETTE.d);
+      }
+    } else if (t < LIFT) {
+      carX = NOSE_AT_WALL;
+      if (t >= REACH) {
+        var p5 = clamp01((t - REACH) / (GRIP - REACH));
+        handShut = t >= GRIP;
+        handY = lerp(-12, carY + HAND_DY, ease(p5, 2));
+      }
+    } else {
+      // And a hand picks it up. That is the part the engine had to learn.
+      var p6 = clamp01((t - LIFT) / (LOOP - LIFT));
+      carX = NOSE_AT_WALL;
+      carY = lerp(GROUND - CAR_H, -CAR_H - 2, ease(p6, 2));
+      handY = carY + HAND_DY;
+    }
+
+    car(carX, carY, spin, t >= WIND && t < HIT);
+    if (handY !== null) sprite(handShut ? HAND_SHUT : HAND_OPEN, carX + HAND_DX, handY);
+  }
+
+  var raf = null;
+  var startedAt = 0;
+  var still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function tick(now) {
+    if (!startedAt) startedAt = now;
+    frame((now - startedAt) % LOOP);
+    raf = window.requestAnimationFrame(tick);
+  }
+
+  logo.addEventListener('click', function () {
+    box.hidden = !box.hidden;
+    if (box.hidden) {
+      // Nothing keeps running behind a closed panel.
+      if (raf) window.cancelAnimationFrame(raf);
+      raf = null;
+      startedAt = 0;
+      return;
+    }
+    if (still) frame(SETTLE - 1);          // the moment of the stop, held, for anyone who asked
+    else raf = window.requestAnimationFrame(tick);
+  });
+})();
+</script>
+</body>
+</html>

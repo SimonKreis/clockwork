@@ -1,0 +1,15 @@
+# Store every text file with LF in the repository, whatever the machine that committed it.
+#
+# This project is developed on Windows, where git's autocrlf turns LF into CRLF on checkout. Left
+# alone, that is harmless locally and produces whole file diffs the day someone commits from macOS
+# or Linux. Normalising here settles it once.
+* text=auto eol=lf
+
+# Fixtures whose exact bytes are the point. The legacy export is parsed by tools/convert-legacy.ts, and
+# the session file is read by Playwright: neither should be rewritten by a line ending rule.
+*.png binary
+selftest/fake-session.json -text
+
+# Windows launcher. cmd.exe misreads blocks and labels in a batch file with LF endings, so this
+# one keeps CRLF in the working tree whatever the rule above says.
+*.cmd text eol=crlf

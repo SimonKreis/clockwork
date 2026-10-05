@@ -1,0 +1,14 @@
+{
+  "cookies": [],
+  "origins": [
+    {
+      "origin": "http://localhost:4173",
+      "localStorage": [
+        {
+          "name": "fakeOracleSession",
+          "value": "selftest"
+        }
+      ]
+    }
+  ]
+}
