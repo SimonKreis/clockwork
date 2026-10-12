@@ -1,0 +1,2 @@
+"URL","UserIdSpecialist","Password","UserIdEmployee","UserIdApprover","title","StartDate","category","searchTerm","bookType","periodAccrual"
+"https://fa-xxxx-dev1-saasfaprod1.fa.ocs.oraclecloud.com/","demo.specialist","NotARealPassword","demo.employee","demo.approver","Demo course","2026-01-15","Compliance","Demo request","Corporate","1250.00"

@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Fake Oracle HCM</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; }
+    .screen { display: none; }
+    .screen.active { display: block; }
+    label { display: block; margin-top: .8rem; font-weight: 600; }
+    input, .rte { padding: .4rem; width: 22rem; border: 1px solid #999; }
+    .rte { min-height: 3rem; }
+    .dropdown { padding: .4rem; width: 22rem; border: 1px solid #999; cursor: pointer; }
+    .fieldlabel { display: block; margin-top: .8rem; font-weight: 600; }
+    iframe { border: 1px solid #999; margin-top: 1rem; display: block; }
+    button, .action { margin-top: 1rem; margin-right: .5rem; padding: .4rem .9rem; cursor: pointer; }
+    .menu a { display: block; padding: .3rem 0; cursor: pointer; color: #0b5; }
+    ul.lov { border: 1px solid #999; list-style: none; padding: 0; margin: 0; width: 22rem; }
+    ul.lov li { padding: .3rem; cursor: pointer; }
+    ul.lov li:hover { background: #eef; }
+    #banner { display: none; margin-top: 1rem; padding: .5rem; background: #fdecea; color: #900; }
+  </style>
+</head>
+<body>
+
+<!-- Sign in. Never reached by a test: the engine arrives with a session already captured, the
+     way npm run auth captures a real one. It exists so the "session expired" path has something
+     to detect, and it is deliberately a single page form with a button labelled "Next", which is
+     the shape the legacy export shows. -->
+<div id="signin" class="screen active">
+  <h1>Sign In</h1>
+  <label for="u">User ID</label><input id="u" />
+  <label for="p">Password</label><input id="p" type="password" />
+  <button type="button" onclick="signIn()"><span>Next</span></button>
+  <div id="loginerr" role="alert" style="display:none">Invalid user ID or password.</div>
+</div>
+
+<div id="home" class="screen">
+  <h1>Welcome</h1>
+  <a title="Navigator" onclick="show('menu')">Navigator</a>
+</div>
+
+<div id="menu" class="screen">
+  <div class="menu">
+    <a onclick="show('learningmenu')">My Client Groups</a>
+    <a onclick="show('menu')">My Team</a>
+  </div>
+</div>
+
+<div id="learningmenu" class="screen">
+  <div class="menu">
+    <a onclick="show('coursesmenu')">Learning</a>
+    <a onclick="show('learningmenu')">Absences</a>
+  </div>
+</div>
+
+<div id="coursesmenu" class="screen">
+  <div class="menu">
+    <a onclick="show('courselist')">Courses</a>
+    <a onclick="show('coursesmenu')">Learning Assignments</a>
+  </div>
+</div>
+
+<div id="courselist" class="screen">
+  <h1>Courses</h1>
+  <a class="action" onclick="show('courseform')"><span>Create</span></a>
+</div>
+
+<div id="courseform" class="screen">
+  <h1>Create Course</h1>
+
+  <label for="title">Title</label><input id="title" />
+
+  <label for="syl">Syllabus</label><div id="syl" class="rte" contenteditable="true"></div>
+
+  <label for="sd">Publish Start Date</label><input id="sd" />
+
+  <!-- No label and no accessible name: only a generated id, like a real ADF field.
+       The blueprint step for this one has to fall back to the legacy XPath. -->
+  <span id="pt1:r1:0:edDtInp"><input id="ed" /></span>
+
+  <div><span>Course Number</span> <span id="crn">CRS-00042</span></div>
+
+  <!-- List of values with an asynchronous suggestion list, the Fusion breakage point. -->
+  <label for="cat">Category</label>
+  <input id="cat" role="combobox" autocomplete="off" oninput="suggest()" />
+  <ul id="catlist" class="lov" role="listbox" style="display:none"></ul>
+
+  <!-- A plain choice list, which looks like the field above and behaves nothing like it.
+       Typing into it does nothing: it has to be opened and picked from (mode: dropdown). -->
+  <!-- Not an <input>, and not a <label for> either: a JET style widget that carries its
+       accessible name through aria-labelledby, which is how Redwood actually names these. -->
+  <span class="fieldlabel" id="dlvlbl">Delivery Mode</span>
+  <div id="dlv" role="combobox" tabindex="0" class="dropdown"
+       aria-labelledby="dlvlbl" onclick="openDelivery()">&nbsp;</div>
+  <ul id="dlvlist" class="lov" role="listbox" style="display:none"></ul>
+
+  <!-- A control with no accessible name at all, reached by double clicking the row that carries
+       its own visible text. The legacy platform's `double click on`. -->
+  <div id="learners">
+    <span id="learnerrow" ondblclick="addLearner()">Learners</span>
+    <span id="learnercount">0 learner(s)</span>
+  </div>
+
+  <!-- A page inside the page. The label "Approval Note" exists only in the inner document, so
+       nothing that searches the outer one can ever find it, whatever the search method. -->
+  <iframe id="notesframe" title="Approval" src="/frame" width="420" height="120"></iframe>
+
+  <button type="button" onclick="save()">Save and Close</button>
+  <div id="banner" role="alert"></div>
+</div>
+
+<div id="saved" class="screen">
+  <h1>Course saved</h1>
+  <p id="savedtitle"></p>
+</div>
+
+<script>
+  // A captured session, restored the way Playwright restores a storageState file. The engine
+  // never signs in: it arrives here already inside the application.
+  if (localStorage.getItem('fakeOracleSession')) {
+    window.addEventListener('DOMContentLoaded', () => show('home'));
+  }
+
+  function show(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
+
+  function signIn() {
+    const user = document.getElementById('u').value;
+    const pass = document.getElementById('p').value;
+    if (!user || !pass) {
+      document.getElementById('loginerr').style.display = 'block';
+      return;
+    }
+    show('home');
+  }
+
+  const CATEGORIES = ['HR', 'HR Compliance', 'Finance', 'Information Technology'];
+
+  function suggest() {
+    const input = document.getElementById('cat');
+    const list = document.getElementById('catlist');
+    const typed = input.value.trim().toLowerCase();
+    list.innerHTML = '';
+    if (!typed) { list.style.display = 'none'; return; }
+
+    // Deliberately asynchronous, like Fusion type ahead. A test that types and immediately
+    // presses Tab would race this.
+    setTimeout(() => {
+      const matches = CATEGORIES.filter(c => c.toLowerCase().includes(typed));
+      if (matches.length === 0) { list.style.display = 'none'; return; }
+      matches.forEach(c => {
+        const li = document.createElement('li');
+        li.setAttribute('role', 'option');
+        li.textContent = c;
+        li.onclick = () => { input.value = c; list.style.display = 'none'; };
+        list.appendChild(li);
+      });
+      list.style.display = 'block';
+    }, 600);
+  }
+
+  const DELIVERY = ['Instructor-Led', 'Self-Paced', 'Blended'];
+
+  function openDelivery() {
+    const list = document.getElementById('dlvlist');
+    if (list.style.display === 'block') { list.style.display = 'none'; return; }
+    list.innerHTML = '';
+    DELIVERY.forEach(d => {
+      const li = document.createElement('li');
+      li.setAttribute('role', 'option');
+      li.textContent = d;
+      li.onclick = () => {
+        document.getElementById('dlv').textContent = d;
+        list.style.display = 'none';
+      };
+      list.appendChild(li);
+    });
+    list.style.display = 'block';
+  }
+
+  function addLearner() {
+    document.getElementById('learnercount').textContent = '1 learner(s)';
+  }
+
+  function save() {
+    const title = document.getElementById('title').value;
+    const banner = document.getElementById('banner');
+
+    // Oracle refusing an operation without blocking the click sequence: the exact blind spot
+    // the generic error check exists to close.
+    if (!title) {
+      banner.textContent = 'You must enter a value for Title.';
+      banner.style.display = 'block';
+      return;
+    }
+    document.getElementById('savedtitle').textContent = 'Course ' + title + ' was created.';
+    show('saved');
+  }
+</script>
+</body>
+</html>

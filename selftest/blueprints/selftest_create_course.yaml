@@ -1,0 +1,86 @@
+# The worked example of the blueprint format, and the fixture of the end to end self test.
+#
+# It is the same file for both on purpose: an example that is executed on every `npm run selftest`
+# cannot drift away from what the engine actually accepts. Read this before writing your first
+# blueprint. It runs against selftest/fake-oracle, not against Oracle.
+#
+# Notice what is NOT here: no sign in, no password, no persona, no selector of any kind. The run
+# starts inside an already open session (npm run auth), and every element is found by the label a
+# person can read on screen.
+#
+# It exercises every construct that matters:
+#   - an in application navigation path
+#   - fill, on a field with a proper visible label
+#   - select, twice: a type ahead list of values, and a plain choice list (mode: dropdown)
+#   - a double click, and a key press aimed at a field
+#   - fill, on a field that lives inside an iframe, which the blueprint never has to mention
+#   - capture, reading a generated read only value for reuse
+#   - verify, the assertion the legacy platform never had
+
+scenario: selftest_create_course
+source: SELFTEST-1
+app: oracle-hcm
+area: learning
+ui: redwood
+description: >
+  Offline reference scenario. Creates a course in the fake Oracle used by the self test.
+data_profile: selftest
+
+steps:
+  - action: navigate
+    path: ["Navigator", "My Client Groups", "Learning", "Courses"]
+
+  - action: click
+    label: "Create"
+
+  - action: fill
+    label: "Title"
+    value: "{{title}}"
+
+  - action: fill
+    label: "Syllabus"
+    value: "{{syllabus}}"
+
+  - action: fill
+    label: "Publish Start Date"
+    value: "{{StartDate}}"
+
+  # A key press that no other step implies. The legacy platform spells this "press tab key on".
+  - action: press_key
+    key: "Tab"
+    label: "Publish Start Date"
+
+  - action: capture
+    label: "Course Number"
+    as: course_number
+
+  # A type ahead list of values: typed into, then picked from an asynchronous list.
+  - action: select
+    label: "Category"
+    value: "{{category}}"
+    match: exact
+
+  # A plain choice list. It looks like the field above and behaves nothing like it: typing does
+  # nothing, so it is opened and picked from.
+  - action: select
+    label: "Delivery Mode"
+    value: "{{delivery}}"
+    mode: dropdown
+
+  # The row has no button and no accessible name of its own. Double clicking it is what a person
+  # does, so it is what the test does.
+  - action: click
+    label: "Learners"
+    double: true
+
+  # "Approval Note" exists only inside an embedded document. The blueprint says nothing about
+  # frames: the engine searches the page, then every frame in it.
+  - action: fill
+    label: "Approval Note"
+    value: "{{note}}"
+
+  - action: click
+    label: "Save and Close"
+
+  - action: verify
+    text_contains: "was created"
