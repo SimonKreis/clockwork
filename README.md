@@ -3,6 +3,8 @@
 A Playwright test engine for Oracle Fusion Cloud that binds every step to a visible label instead of
 a selector, and pauses and learns the fix when a label changes.
 
+**Simon Kreis & Claude.** Made with AI, mainly Claude (Anthropic), which contributed in part or in whole to the work. Simon Kreis is responsible for the result.
+
 > **Complete:** verified by 70 offline checks. No further work is planned here. Its concepts now
 > continue in an agent-driven successor.
 
