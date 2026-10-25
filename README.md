@@ -57,7 +57,7 @@ and it turned out to describe every decision in this project, so it became the n
 | **A clean stop at the first obstacle.** It does not thrash, it does not fall over, it stops. | A step that cannot find its element halts the run and says exactly what it was looking for. A blocked test is a valid outcome, not a defect. |
 | **You pick it up and put it back on course.** | Assisted mode: the browser waits for you on the failing screen, and you do the action yourself. |
 
-And the one thing a real wind up toy cannot do, which is the whole point of this version: **it
+And the one thing a real wind up toy cannot do, which is the whole point of this engine: **it
 remembers the correction.** What you did by hand is written back into the test file, so the next run
 does not stop there.
 
@@ -316,11 +316,10 @@ The resolution chain is:
 visible label -> ARIA role and name -> title -> placeholder -> adjacent text -> hints
 ```
 
-and then it stops and asks you. Earlier versions kept the legacy XPath as a last resort, so the engine
-"could never do worse than the legacy platform". That rested on getting a complete object repository out of the legacy platform,
-and that turned out to be impossible: the exports carry 302 object references and no XPath at all.
-A safety net that is always empty still costs a schema field, a code path and a concept, so it is
-gone.
+and then it stops and asks you. There is no legacy XPath as a last resort. It would let the engine
+"never do worse than the legacy platform", but only with a complete object repository out of the
+legacy platform, and that is impossible: the exports carry 302 object references and no XPath at all.
+A safety net that is always empty still costs a schema field, a code path and a concept.
 
 The consequence is deliberate. A step whose label is wrong now fails immediately instead of quietly
 working against a selector that will rot at the next Oracle patch. Under assisted mode that is a
