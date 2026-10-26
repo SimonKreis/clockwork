@@ -1,5 +1,7 @@
 # Clockwork
 
+**English** · [Français](README.fr.md)
+
 A Playwright test engine for Oracle Fusion Cloud that binds every step to a visible label instead of
 a selector, and pauses and learns the fix when a label changes.
 
